@@ -1,0 +1,80 @@
+
+@startuml
+package fibercrypto {
+
+package fibercrypto.util <<Frame>> {
+}
+
+package fibercrypto.main <<Frame>> {
+}
+
+package fibercrypto.core <<Frame>> {
+interface AltcoinPlugin
+interface AltcoinManager
+
+}
+
+package fibercrypto.coin <<Frame>> {
+class SkycoinPlugin
+class BitcoinPlugin
+class EthereumPlugin
+}
+
+}
+
+note bottom : All other interfaces omitted
+
+package FiberCryptoPy <<Rectangle>> {
+}
+
+package FiberCryptoForLanguageX <<Rectangle>> {
+}
+
+package cgo <<Cloud>> {
+}
+
+package cgogen <<Cloud>> {
+}
+
+package swig <<Cloud>> {
+}
+
+package fibercyptoc {
+
+package libfibercrypto.wrappers <<Frame>> {
+}
+
+package fibercryptoh <<Rectangle>> {
+}
+
+package libfibercrypto <<Rectangle>> {
+}
+
+}
+
+fibercyptoc -[hidden]-- fibercrypto
+cgo -[hidden]-- swig
+cgo -[hidden]-- cgogen
+FiberCryptoForLanguageX -[hidden]-- FiberCryptoPy
+
+fibercrypto.coin +-- fibercrypto.core
+fibercrypto.util +-- fibercrypto.core
+fibercrypto.coin +-- fibercrypto.util
+
+SkycoinPlugin --|> AltcoinPlugin
+BitcoinPlugin --|> AltcoinPlugin
+EthereumPlugin --|> AltcoinPlugin
+
+cgogen -> libfibercrypto.wrappers
+cgogen <- fibercrypto.util
+cgogen <- fibercrypto.main
+cgogen <- fibercrypto.core
+libfibercrypto.wrappers -> cgo
+cgo -> libfibercrypto
+cgo -> fibercryptoh
+libfibercrypto +-- fibercryptoh
+fibercryptoh --> swig
+swig -> FiberCryptoPy
+swig -> FiberCryptoForLanguageX
+@enduml
+
