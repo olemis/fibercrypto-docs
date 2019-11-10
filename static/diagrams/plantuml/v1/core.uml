@@ -1,0 +1,278 @@
+
+@startuml
+skinparam ClassBorderColor<< CryptoCurrencyToken >> Black
+skinparam ClassBackgroundColor<< CryptoCurrencyToken >> White
+
+
+interface CryptoAccount
+interface Address
+interface Iterator<T>
+interface AddressIterator
+interface TxnSigner
+interface TxnSignerIterator
+class Timestamp <<uint64>>
+enum TransactionStatus
+interface Transaction
+interface TransactionIterator
+interface TransactionInput
+interface TransactionInputIterator
+interface TransactionOutput
+interface TransactionOutputIterator
+interface Block
+interface AltcoinPlugin
+interface AltcoinManager
+enum CoinValueMetric
+interface BlockchainStatus
+interface PEX
+interface PexNodeIterator
+interface PexNodeSet
+interface PexNode
+interface KeyValueStorage
+interface WalletSet
+interface WalletStorage
+interface WalletIterator
+enum AddressType
+interface Wallet
+interface SeedGenerator
+interface WalletEnv
+interface BlockchainTransactionAPI
+interface BlockchainSignService
+interface WalletOutput
+interface WalletAddress
+
+TxnSignerIterator --|> Iterator : bind <ItemType=TxnSigner>
+AddressIterator --|> Iterator : bind <ItemType=Address>
+TransactionInputIterator --|> Iterator : bind <ItemType=TransactionInput>
+TransactionOutputIterator --|> Iterator : bind <ItemType=TransactionOutput>
+TransactionIterator --|> Iterator : bind <ItemType=Transaction>
+PexNodeIterator --|> Iterator : bind <ItemType=PexNode>
+WalletIterator --|> Iterator : bind <ItemType=Wallet>
+
+class AltcoinMetadata {
+	Name string
+	Ticker string
+	Family string
+	HasBip44 bool
+	Bip44CoinType int32
+	Accuracy int32
+}
+
+class InputSignDescriptor {
+	InputIndex string
+	SignerID UID
+	Wallet Wallet
+}
+
+CryptoAccount : GetBalance(ticker string) (uint64, error)
+CryptoAccount : ListAssets() []string
+CryptoAccount : ScanUnspentOutputs() TransactionOutputIterator
+CryptoAccount : ListTransactions() TransactionIterator
+CryptoAccount : ListPendingTransactions() (TransactionIterator, error)
+
+CryptoAccount --> TransactionOutputIterator
+CryptoAccount --> TransactionIterator
+
+Address : IsBip32() bool
+Address : String() string
+Address : GetCryptoAccount() CryptoAccount
+
+Address --> CryptoAccount
+
+TxnSigner : SignTransaction(Transaction, PasswordReader, []string) (Transaction, error)
+TxnSigner : GetSignerUID() UID
+TxnSigner : GetSignerDescription() string
+
+TxnSigner --> Transaction : sign
+TxnSigner ..> PasswordReader
+
+Iterator : Value() ItemType
+Iterator : Next() bool
+Iterator : HasNext() bool
+Iterator : Count() int
+
+Transaction : SupportedAssets() []string
+Transaction : GetTimestamp() Timestamp
+Transaction : GetStatus() TransactionStatus
+Transaction : GetInputs() []TransactionInput
+Transaction : GetOutputs() []TransactionOutput
+Transaction : GetId() string
+Transaction : ComputeFee(ticker string) (uint64, error)
+Transaction : VerifyUnsigned() error
+Transaction : VerifySigned() error
+Transaction : IsFullySigned() (bool, error)
+
+Transaction --> Timestamp
+Transaction --> TransactionStatus
+Transaction "1" *--> "*" TransactionInput
+Transaction "1" *--> "*" TransactionOutput
+
+TransactionInput : GetId() string
+TransactionInput : GetSpentOutput() TransactionOutput
+TransactionInput : GetCoins(ticker string) (uint64, error)
+TransactionInput : SupportedAssets() []string
+
+TransactionInput --> TransactionOutput : spend
+
+TransactionOutput : GetId() string
+TransactionOutput : IsSpent() bool
+TransactionOutput : GetAddress() Address
+TransactionOutput : GetCoins(ticker string) (uint64, error)
+TransactionOutput : SupportedAssets() []string
+
+TransactionOutput "*" --> "1" Address : fund
+
+Block : GetHash() ([]byte, error)
+Block : GetPrevHash() ([]byte, error)
+Block : GetVersion() (uint32, error)
+Block : GetTime() (Timestamp, error)
+Block : GetHeight() (uint64, error)
+Block : GetFee(ticker string) (uint64, error)
+Block : IsGenesisBlock() (bool, error)
+Block : GetTransactions() (TransactionIterator, error)
+
+Block "*" *--> Transaction
+Block --> Timestamp
+Block --> TransactionIterator
+
+AltcoinPlugin : ListSupportedAltcoins() []AltcoinMetadata
+AltcoinPlugin : ListSupportedFamilies() []string
+AltcoinPlugin : RegisterTo(manager AltcoinManager)
+AltcoinPlugin : GetName() string
+AltcoinPlugin : GetDescription() string
+AltcoinPlugin : LoadWalletEnvs() []WalletEnv
+AltcoinPlugin : LoadPEX(netType string) (PEX, error)
+AltcoinPlugin : LoadTransactionAPI(netType string) (BlockchainTransactionAPI, error)
+AltcoinPlugin : LoadSignService() (BlockchainSignService, error)
+
+class CryptoCurrencyToken
+
+AltcoinPlugin "1" -- "*" CryptoCurrencyToken : implements
+AltcoinManager "registry" <-- "plugin" AltcoinPlugin : registration
+AltcoinPlugin "1" --> "*" WalletEnv
+AltcoinPlugin --> PEX
+AltcoinPlugin --> BlockchainTransactionAPI
+AltcoinPlugin --> BlockchainSignService
+
+(AltcoinPlugin, CryptoCurrencyToken) .. AltcoinMetadata
+
+AltcoinManager : RegisterPlugin(p AltcoinPlugin)
+AltcoinManager : RegisterAltcoin(info AltcoinMetadata, plugin AltcoinPlugin)
+AltcoinManager : ListRegisteredPlugins() []AltcoinPlugin
+AltcoinManager : LookupAltcoinPlugin(ticker string) (AltcoinPlugin, bool)
+AltcoinManager : DescribeAltcoin(ticker string) (AltcoinMetadata, bool)
+
+AltcoinManager "1" o--> "*" AltcoinPlugin
+AltcoinManager "cache" --> "record" AltcoinMetadata
+
+BlockchainStatus : GetCoinValue(coinvalue CoinValueMetric, ticker string) (uint64, error)
+BlockchainStatus : GetLastBlock() (Block, error)
+BlockchainStatus : GetNumberOfBlocks() (uint64, error)
+
+BlockchainStatus --> Block
+BlockchainStatus ..> CoinValueMetric
+
+PEX : GetTxnPool() (TransactionIterator, error)
+PEX : GetConnections() (PexNodeSet, error)
+PEX : BroadcastTxn(txn Transaction) error
+
+PEX --> TransactionIterator
+PEX --> PexNodeSet
+PEX ..> Transaction : P2P broadcast
+
+PexNodeSet : ListPeers() PexNodeIterator
+
+PexNodeSet --> PexNodeIterator
+PexNodeSet "*" o--> "*" PexNode
+
+PexNode : GetIp() string
+PexNode : GetPort() uint16
+PexNode : GetBlockHeight() uint64
+PexNode : IsTrusted() bool
+PexNode : GetLastSeenIn() int64
+PexNode : GetLastSeenOut() int64
+
+KeyValueStorage : GetValue(key string) interface{}
+KeyValueStorage : SetValue(key string, value interface{})
+
+WalletSet : ListWallets() WalletIterator
+WalletSet : GetWallet(id string) Wallet
+WalletSet : CreateWallet(name string, seed string, isEncryptrd bool, pwd PasswordReader, scanAddressesN int) (Wallet, error)
+
+WalletSet --> WalletIterator
+WalletSet o--> Wallet
+WalletSet ..> PasswordReader
+
+WalletStorage : Encrypt(walletName string, password PasswordReader)
+WalletStorage : Decrypt(walletName string, password PasswordReader)
+WalletStorage : IsEncrypted(walletName string) (bool, error)
+
+WalletStorage ..> PasswordReader
+
+Wallet : GetId() string
+Wallet : GetLabel() string
+Wallet : SetLabel(wltName string)
+Wallet : Transfer(to TransactionOutput, options KeyValueStorage) (Transaction, error)
+Wallet : SendFromAddress(from []Address, to []TransactionOutput, change Address, options KeyValueStorage) (Transaction, error)
+Wallet : Spend(unspent, new []TransactionOutput, change Address, options KeyValueStorage) (Transaction, error)
+Wallet : GenAddresses(addrType AddressType, startIndex, count uint32, pwd PasswordReader) AddressIterator
+Wallet : GetCryptoAccount() CryptoAccount
+Wallet : GetLoadedAddresses() (AddressIterator, error)
+Wallet : Sign(txn Transaction, source UID, pwd PasswordReader, index []string) (Transaction, error)
+Wallet : AttachSignService(TxnSigner) error
+Wallet : RemoveSignService(TxnSigner) error
+Wallet : EnumerateSignServices() TxnSignerIterator
+
+Wallet ..> PasswordReader
+Wallet ..> KeyValueStorage
+Wallet ..> TransactionOutput
+Wallet --> Transaction : create
+Wallet --> Transaction : sign
+Wallet "1" ..> "*" TxnSigner
+Wallet ..> Address
+Wallet ..> AddressType
+Wallet --> AddressIterator
+Wallet --> TxnSignerIterator
+Wallet --> CryptoAccount
+
+SeedGenerator : GenerateMnemonic(wordCount int) (string, error)
+SeedGenerator : VerifyMnemonic(seed string) (bool, error)
+
+Wallet ..> SeedGenerator
+
+WalletEnv : GetStorage() WalletStorage
+WalletEnv : GetWalletSet() WalletSet
+
+WalletEnv "1" o--> "1" WalletStorage
+WalletEnv "1" o--> "1" WalletSet
+
+BlockchainTransactionAPI : SendFromAddress(from []WalletAddress, to []TransactionOutput, change Address, options KeyValueStorage) (Transaction, error)
+BlockchainTransactionAPI : Spend(unspent []WalletOutput, new []TransactionOutput, change Address, options KeyValueStorage) (Transaction, error)
+
+BlockchainTransactionAPI ..> WalletAddress
+BlockchainTransactionAPI ..> TransactionOutput
+BlockchainTransactionAPI ..> WalletOutput
+BlockchainTransactionAPI ..> Address
+BlockchainTransactionAPI ..> KeyValueStorage
+BlockchainTransactionAPI --> Transaction
+
+BlockchainSignService : Sign(txn Transaction, signSpec []InputSignDescriptor, pwd PasswordReader) (Transaction, error)
+
+BlockchainSignService ..> Transaction
+BlockchainSignService ..> InputSignDescriptor
+BlockchainSignService ..> PasswordReader
+BlockchainSignService --> Transaction
+
+WalletOutput : GetWallet() Wallet
+WalletOutput : GetOutput() TransactionOutput
+
+WalletOutput o--> Wallet
+WalletOutput o--> TransactionOutput
+
+WalletAddress : GetWallet() Wallet
+WalletAddress : GetAddress() Address
+
+WalletAddress o--> Wallet
+WalletAddress o--> Address
+
+@enduml
+
