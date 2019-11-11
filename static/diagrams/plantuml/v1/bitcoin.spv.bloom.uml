@@ -1,0 +1,10 @@
+@startuml
+
+participant "FiberCrypto Bitcoin SPV" as wallet
+participant "Bitcoin node" as btcnode
+wallet -> btcnode : filterload(nFlags=BLOOM_UPDATE_ALL, ...)
+wallet -> btcnode : get(inventory_type=MSG_MERKLEBLOCK, ...)
+wallet <-- btcnode : merkleblock(TXID1, TXID2, ...)
+wallet -> wallet : validate_merkleblock
+
+@enduml
